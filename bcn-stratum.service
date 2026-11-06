@@ -1,0 +1,22 @@
+[Unit]
+Description=Bytecoin solo stratum bridge for Antminer X3
+After=bytecoind.service network-online.target
+Wants=bytecoind.service network-online.target
+
+[Service]
+Type=simple
+User=bytecoin
+Group=bytecoin
+EnvironmentFile=/etc/bcn-stratum.env
+Environment=BCN_LIMIT_FILE=/etc/bcn-stratum-limit.conf
+WorkingDirectory=/opt/bcn-stratum
+ExecStart=/usr/bin/python3 /opt/bcn-stratum/bcn_stratum.py --listen 0.0.0.0:3333 --share-diff 60000
+Restart=on-failure
+RestartSec=10
+NoNewPrivileges=true
+ProtectSystem=full
+ProtectHome=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
