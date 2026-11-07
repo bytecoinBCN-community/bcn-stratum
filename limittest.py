@@ -63,7 +63,34 @@ check("our on-chain share ~50%% (got %.0f%%)" % (share * 100), abs(share - 0.5) 
 raw = lim.estimate(net_diff)[0]
 check("raw hashrate taken from candidates (got %.0f KH/s)" % (raw / 1000), abs(raw - X3) / X3 < 0.01)
 
-# too few candidates in the last hour -> fall back to share work
+# a lucky or an unlucky last hour must not change the raw estimate: 24 h of 190 KH/s, last hour 280 or nothing
+X3 = 190000.0
+net_diff = 190000.0 * bs.BLOCK_TARGET
+
+
+def day_with_last_hour(rate):
+    return [(clock[0] - 60 * i, X3 * 60 / 30, (rate if i < 60 else X3) * 60, (rate if i < 60 else X3) * 60 / net_diff,
+             0.41, 60) for i in range(24 * 60)]
+
+
+lim.history = day_with_last_hour(280000.0)
+raw = lim.estimate(net_diff)[0]
+check("lucky hour barely moves raw (got %.0f KH/s)" % (raw / 1000), abs(raw - X3) / X3 < 0.03)
+lim.history = day_with_last_hour(0.0)
+raw = lim.estimate(net_diff)[0]
+check("empty hour barely moves raw (got %.0f KH/s)" % (raw / 1000), abs(raw - X3) / X3 < 0.05)
+
+# the ratio stays at its ceiling through such an hour
+with open(path, "w") as f:
+    f.write("submit_ratio = 0.41\ntarget_share = 0.46\nmin_ratio = 0.01\nmax_ratio = 0.41\nadjust_hours = 6\n")
+os.utime(path, (time.time() + 20, time.time() + 20))
+lim = bs.Limiter(path)
+lim.started = lim.last_adjust = clock[0] - 2 * bs.DIFFICULTY_SPAN
+lim.history = day_with_last_hour(280000.0)
+lim.adjust(net_diff)
+check("lucky hour leaves ratio at 0.41 (got %.4f)" % lim.ratio, abs(lim.ratio - 0.41) < 1e-9)
+
+# too few candidates in the whole window -> fall back to share work
 lim.history = [(clock[0] - 60 * i, 6000.0 * 60, 0.0, 0.0, 0.02, 60) for i in range(60)]
 check("share work used when no candidates", abs(lim.estimate(net_diff)[0] - 6000.0) < 1)
 print("LIMITTEST", "PASSED" if ok else "FAILED")

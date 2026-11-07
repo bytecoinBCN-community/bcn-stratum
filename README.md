@@ -17,7 +17,7 @@ The limiter submits only a share of found blocks, so the miner counts on chain a
 Settings are in a limit file, re-read every minute. See [limit.example.conf](limit.example.conf).
 
 - **Fixed mode:** `submit_ratio` sets the share of found blocks to submit.
-- **Auto mode:** `target_share` keeps your on-chain share near a target. The ratio changes at most x1.25 per step, within `min_ratio` and `max_ratio`. The first change can happen 24 hours after the bridge starts.
+- **Auto mode:** `target_share` keeps your on-chain share near a target. The ratio changes at most x1.25 per step, within `min_ratio` and `max_ratio`. The estimates average the last 24 hours, because an hour holds too few block candidates to measure hashrate. The first change can happen 24 hours after the bridge starts.
 
 The current ratio is not saved across restarts. After a restart the bridge starts from `submit_ratio`, so set it to the value you want to resume from.
 

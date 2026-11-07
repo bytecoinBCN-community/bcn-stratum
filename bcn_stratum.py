@@ -117,16 +117,19 @@ class Limiter:
         return [h[2] if by_cands else h[1] for h in entries]
 
     def estimate(self, net_diff):
-        """-> (our raw H/s, our on-chain H/s averaged over the difficulty window, others H/s) or None."""
+        """-> (our raw H/s, our on-chain H/s, others H/s), all averaged over the difficulty window, or None.
+
+        An hour holds only about 30 candidates, too few to measure the raw hashrate: the estimate swung from
+        6 to 280 KH/s and moved the ratio by chance.
+        """
         span = sum(h[5] for h in self.history)
-        recent = [h for h in self.history if time.time() - h[0] <= 3600]
-        recent_span = sum(h[5] for h in recent)
-        if span <= 0 or recent_span <= 0 or not net_diff:
+        if span <= 0 or not net_diff:
             return None
-        raw_now = sum(self._work(recent)) / recent_span
-        onchain = sum(w * h[4] for w, h in zip(self._work(self.history), self.history)) / span
+        work = self._work(self.history)
+        raw = sum(work) / span
+        onchain = sum(w * h[4] for w, h in zip(work, self.history)) / span
         others = max(net_diff / BLOCK_TARGET - onchain, 0.0)
-        return raw_now, onchain, others
+        return raw, onchain, others
 
     def adjust(self, net_diff):
         if not self.auto:
@@ -137,15 +140,15 @@ class Limiter:
         est = self.estimate(net_diff)
         if not est or est[0] <= 0:
             return
-        raw_now, _, others = est
+        raw, _, others = est
         s = self.cfg["target_share"]
-        want = s / (1 - s) * others / raw_now
+        want = s / (1 - s) * others / raw
         new = min(max(want, self.ratio / self.STEP, self.cfg["min_ratio"]), self.ratio * self.STEP,
                   self.cfg["max_ratio"])
         self.last_adjust = now
         if abs(new - self.ratio) > 1e-9:
             log.info("auto limit: others~%.1f KH/s, ours raw~%.1f KH/s, ratio %.4f -> %.4f (wanted %.4f)",
-                     others / 1000, raw_now / 1000, self.ratio, new, want)
+                     others / 1000, raw / 1000, self.ratio, new, want)
             self.ratio = new
 
 
